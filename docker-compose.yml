@@ -1,0 +1,29 @@
+# MediTrack — lokal utvecklingsmiljö
+# Kör: docker compose up -d
+# Stoppa: docker compose down
+# Stoppa + radera data: docker compose down -v
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: meditrack-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpw_local_only
+      MYSQL_DATABASE: meditrack
+      MYSQL_USER: meditrack
+      MYSQL_PASSWORD: meditrack_local_only
+      TZ: Europe/Stockholm
+    ports:
+      - "3307:3306"
+    volumes:
+      - meditrack-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpw_local_only"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  meditrack-mysql-data:
+    name: meditrack-mysql-data
