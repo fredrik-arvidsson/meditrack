@@ -1,0 +1,45 @@
+spring:
+  application:
+    name: meditrack
+
+  datasource:
+    url: jdbc:mysql://localhost:3307/meditrack?useSSL=false&serverTimezone=Europe/Stockholm&allowPublicKeyRetrieval=true
+    username: meditrack
+    password: meditrack_local_only
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 10000
+      pool-name: MeditrackHikariCP
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+        jdbc:
+          time_zone: Europe/Stockholm
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: false
+    locations: classpath:db/migration
+    validate-on-migrate: true
+
+server:
+  port: 8080
+  error:
+    include-message: always
+    include-binding-errors: always
+
+logging:
+  level:
+    root: INFO
+    se.meditrack: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
+    org.flywaydb: INFO
