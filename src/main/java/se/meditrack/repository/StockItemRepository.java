@@ -18,13 +18,23 @@ public interface StockItemRepository extends JpaRepository<StockItem, Long> {
 
     /**
      * Hämtar StockItem MED pessimistic write-lås (SELECT ... FOR UPDATE).
-     * Används vid leverans i StockService för att serialisera saldouppdatering
-     * och förhindra lost update vid samtidiga leveranser.
+     * Används vid justering i StockService för att serialisera saldouppdatering
+     * och förhindra lost update vid samtidiga skrivningar.
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT s FROM StockItem s WHERE s.id = :id AND s.careUnit.id = :careUnitId")
     Optional<StockItem> findByIdAndCareUnitIdForUpdate(@Param("id") Long id,
                                                        @Param("careUnitId") Long careUnitId);
+
+    /**
+     * Hämtar StockItem för ett läkemedel inom en vårdenhet, med pessimistic
+     * write-lås. Används av OrderService vid leverans — där har vi
+     * medication-id (från orderraden), inte stockItem-id.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT s FROM StockItem s WHERE s.medication.id = :medicationId AND s.careUnit.id = :careUnitId")
+    Optional<StockItem> findByMedicationAndCareUnitForUpdate(@Param("medicationId") Long medicationId,
+                                                             @Param("careUnitId") Long careUnitId);
 
     /**
      * StockItems under sin threshold — för varningar om lågt lager.
