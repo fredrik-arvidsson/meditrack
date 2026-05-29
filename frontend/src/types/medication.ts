@@ -19,3 +19,25 @@ export type StockItem = {
     threshold: number;
     belowThreshold: boolean;
 };
+
+export type OrderStatus = "DRAFT" | "SENT" | "CONFIRMED" | "DELIVERED" | "CANCELLED";
+
+export type OrderLine = {
+    id: number;
+    medicationId: number;
+    medicationName: string;
+    quantity: number;
+    notes: string | null;
+};
+
+export type Order = {
+    id: number;
+    orderNumber: string;
+    status: OrderStatus;
+    lines: OrderLine[];
+    sentAt: string | null;
+    confirmedAt: string | null;
+    deliveredAt: string | null;
+    createdAt: string;
+    notes: string | null;
+};
