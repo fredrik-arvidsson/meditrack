@@ -10,3 +10,12 @@ export type Medication = {
     controlledSubstance: boolean;
     active: boolean;
 };
+
+export type StockItem = {
+    id: number;
+    medicationId: number;
+    medicationName: string;
+    quantity: number;
+    threshold: number;
+    belowThreshold: boolean;
+};
