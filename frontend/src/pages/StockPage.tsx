@@ -1,8 +1,58 @@
+import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useFetch } from "../hooks/useFetch";
 import type { StockItem } from "../types/medication";
 
+const API_BASE = "http://localhost:8080";
+
+// Svaret från reorder-agenten. Matchar ReorderResult på backend.
+type ReorderResult = {
+    draftOrder: { id: number; orderNumber: string } | null;
+    source: string;
+    message: string;
+};
+
 function StockPage() {
-    const { data, loading, error } = useFetch<StockItem[]>("/api/stock");
+    const [refreshKey, setRefreshKey] = useState(0);
+    const { data, loading, error } = useFetch<StockItem[]>(
+        `/api/stock?_=${refreshKey}`
+    );
+
+    const [reorderLoading, setReorderLoading] = useState(false);
+    const [reorderError, setReorderError] = useState<string | null>(null);
+    const [reorderResult, setReorderResult] = useState<ReorderResult | null>(null);
+
+    async function suggestReorder() {
+        setReorderLoading(true);
+        setReorderError(null);
+        setReorderResult(null);
+        try {
+            const response = await fetch(
+                `${API_BASE}/api/orders/suggest-reorder`,
+                { method: "POST" }
+            );
+            if (!response.ok) {
+                let message = `HTTP ${response.status}`;
+                try {
+                    const body = await response.json();
+                    if (body?.message) {
+                        message = body.message;
+                    }
+                } catch {
+                    // svaret var inte JSON - behåll status-meddelandet
+                }
+                throw new Error(message);
+            }
+            const result: ReorderResult = await response.json();
+            setReorderResult(result);
+            // Lagret kan ha ändrats av andra skäl - hämta om för säkerhets skull.
+            setRefreshKey((k) => k + 1);
+        } catch (err) {
+            setReorderError(err instanceof Error ? err.message : "Okänt fel");
+        } finally {
+            setReorderLoading(false);
+        }
+    }
 
     if (loading) {
         return <p className="text-slate-600">Laddar lager...</p>;
@@ -29,6 +79,52 @@ function StockPage() {
                     </p>
                 )}
             </div>
+
+            {/* AI-agent: föreslå påfyllning. Skapar ett DRAFT-utkast som
+                en människa granskar och skickar — agenten beslutar aldrig. */}
+            <div className="mb-4 flex items-center gap-3">
+                <button
+                    onClick={suggestReorder}
+                    disabled={reorderLoading || lowStockCount === 0}
+                    className="px-4 py-2 text-sm font-medium rounded-md bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50"
+                    title={
+                        lowStockCount === 0
+                            ? "Inga läkemedel under tröskel — inget att föreslå"
+                            : "Skapar ett påfyllningsutkast för granskning"
+                    }
+                >
+                    {reorderLoading ? "Genererar förslag..." : "Föreslå påfyllning (AI)"}
+                </button>
+                {lowStockCount === 0 && (
+                    <span className="text-sm text-slate-500">
+                        Inget under tröskel att fylla på.
+                    </span>
+                )}
+            </div>
+
+            {reorderError && (
+                <div className="mb-4 rounded-md bg-red-50 border border-red-200 p-4">
+                    <p className="text-red-900 font-medium">Kunde inte generera förslag</p>
+                    <p className="text-red-700 text-sm mt-1">{reorderError}</p>
+                </div>
+            )}
+
+            {reorderResult && (
+                <div className="mb-4 rounded-md bg-emerald-50 border border-emerald-200 p-4">
+                    <p className="text-emerald-900 font-medium">{reorderResult.message}</p>
+                    <p className="text-emerald-700 text-sm mt-1">
+                        Källa: {reorderResult.source}
+                    </p>
+                    {reorderResult.draftOrder && (
+                        <Link
+                            to={`/orders/${reorderResult.draftOrder.id}`}
+                            className="text-sm text-emerald-800 underline hover:text-emerald-900 mt-2 inline-block"
+                        >
+                            Öppna utkast {reorderResult.draftOrder.orderNumber} →
+                        </Link>
+                    )}
+                </div>
+            )}
 
             <div className="bg-white rounded-md border border-slate-200 overflow-hidden">
                 <table className="w-full text-sm">
