@@ -14,7 +14,8 @@ public interface StockItemRepository extends JpaRepository<StockItem, Long> {
 
     Optional<StockItem> findByIdAndCareUnitId(Long id, Long careUnitId);
 
-    List<StockItem> findAllByCareUnitId(Long careUnitId);
+    @Query("SELECT s FROM StockItem s WHERE s.careUnit.id = :careUnitId ORDER BY s.medication.name ASC")
+    List<StockItem> findAllByCareUnitId(@Param("careUnitId") Long careUnitId);
 
     /**
      * Hämtar StockItem MED pessimistic write-lås (SELECT ... FOR UPDATE).
