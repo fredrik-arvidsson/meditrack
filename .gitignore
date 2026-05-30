@@ -53,3 +53,9 @@ docker-compose.override.yml
 *.swp
 *.swo
 *~
+
+# Internt arbetsdokument — inte för publikt repo
+MEDITRACK_MOTIVERINGAR.md
+
+# Internt arbetsdokument — inte för publikt repo
+MEDITRACK_MOTIVERINGAR.md
