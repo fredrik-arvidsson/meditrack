@@ -54,8 +54,16 @@ function OrderDetailPage() {
                 { method: "POST" }
             );
             if (!response.ok) {
-                const body = await response.text();
-                throw new Error(body || `HTTP ${response.status}`);
+                let message = `HTTP ${response.status}`;
+                try {
+                    const body = await response.json();
+                    if (body?.message) {
+                        message = body.message;
+                    }
+                } catch {
+                    // svaret var inte JSON - behåll status-meddelandet
+                }
+                throw new Error(message);
             }
             setRefreshKey((k) => k + 1);
         } catch (err) {
