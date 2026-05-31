@@ -26,7 +26,7 @@ Detta startar en MySQL 8.4-container på port `3307`. Containern heter `meditrac
 ./mvnw spring-boot:run
 ```
 
-Spring Boot startar på port `8080`. Vid första uppstarten kör Flyway migrationerna (`V1__init.sql`) och seed-skriptet (`R__seed.sql`), så databasen är direkt fylld med två vårdenheter, sju läkemedel, sju lagerposter och två beställningar.
+Spring Boot startar på port `8080`. Vid första uppstarten kör Flyway migrationerna (`V1__init.sql`) och seed-skriptet (`R__seed.sql`), så databasen är direkt fylld med två vårdenheter, tre användare (en per roll), sju läkemedel, sju lagerposter och två beställningar.
 
 #### Valfritt: aktivera AI-agenten
 
@@ -50,11 +50,27 @@ npm install
 npm run dev
 ```
 
-Vite startar på port `5173`. Öppna [http://localhost:5173](http://localhost:5173) i webbläsaren — appen omdirigerar automatiskt till `/medications`.
+Vite startar på port `5173`. Öppna [http://localhost:5173](http://localhost:5173) i webbläsaren — appen möter dig med en inloggningssida.
+
+### Demo-inloggningar
+
+Tre seed-användare, en per roll. Alla har lösenordet `demo1234`:
+
+| E-post | Roll |
+|--------|------|
+| `anna.lindberg@meditrack.demo` | ADMIN |
+| `erik.svensson@meditrack.demo` | PHARMACIST |
+| `sara.johansson@meditrack.demo` | NURSE |
+
+Rollen styr vad du får göra — bara en apotekare (PHARMACIST) kan bekräfta en beställning (se Verifiera).
 
 ### 4. Verifiera
 
-Frontend ska visa sju läkemedel i en tabell (Morfin är märkt som narkotika). Klicka på "Lager" — sju lagerposter visas, två markerade under tröskel (Paracetamol och Salbutamol). Klicka på "Beställningar": ORD-DEMO0001 är **Skickad**, ORD-DEMO0002 är **Levererad**. Öppna "Visa detaljer" på ORD-DEMO0001 — där kan du klicka "Bekräfta", sedan "Leverera", och se status, tidslinje och lagersaldo uppdateras live (leveransen ökar saldot för Amoxicillin och Natriumklorid).
+Logga in (t.ex. `sara.johansson@meditrack.demo` / `demo1234`). Frontend ska visa sju läkemedel i en tabell (Morfin är märkt som narkotika). Klicka på "Lager" — sju lagerposter, två markerade under tröskel (Paracetamol och Salbutamol). Klicka på "Beställningar": ORD-DEMO0001 är **Skickad**, ORD-DEMO0002 är **Levererad**.
+
+Öppna "Visa detaljer" på ORD-DEMO0001. Som **NURSE** (Sara) ser du *ingen* Bekräfta-knapp — det är rolldöljningen i UI:t. Ladda om sidan för att logga ut (credentials ligger i minnet, så en omladdning återgår till inloggning), och logga in som `erik.svensson@meditrack.demo` (PHARMACIST). Öppna samma order: nu finns Bekräfta. Klicka "Bekräfta", sedan "Leverera", och se status, tidslinje och lagersaldo uppdateras live (leveransen ökar saldot för Amoxicillin och Natriumklorid).
+
+Backend genomdriver rollen oavsett vad UI:t visar: ett anrop mot bekräfta-endpointen som NURSE avvisas med 403, även om knappen skulle tvingas fram. Och separation of duties gäller på personnivå — den som skickat en beställning kan inte bekräfta den ens som apotekare.
 
 Vill du se AI-agenten: gå till "Lager" och klicka "Föreslå påfyllning (AI)". Ett DRAFT-utkast skapas med föreslagna kvantiteter för de läkemedel som ligger under tröskel — för granskning, inte automatisk beställning.
 
@@ -80,19 +96,19 @@ MediTrack är en lagerindelad modulär monolit: en Spring Boot-backend som expon
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  Frontend (Vite + React + TS)        :5173                │
-│  medications · stock · orders · order-detail              │
-│  useFetch-hook → fetch → JSON                             │
+│  login · medications · stock · orders · order-detail      │
+│  apiFetch (Basic auth) → useFetch → JSON                  │
 └───────────────────────────┬─────────────────────────────┘
-                            │  HTTP / JSON  (CORS)
+                            │  HTTP / JSON  (CORS, Basic auth)
                             ▼
 ┌─────────────────────────────────────────────────────────┐
 │  Backend (Spring Boot 3.4.5, Java 21)   :8080            │
 │                                                           │
 │   controller   tunna REST-endpoints, DTO in/ut           │
-│       │        @RestControllerAdvice → enhetlig ApiError  │
+│       │        @PreAuthorize (roll) + global ApiError     │
 │       ▼                                                   │
 │   service      affärslogik, @Transactional,               │
-│       │        state machine, lås, tenant-scoping         │
+│       │        state machine, lås, separation of duties   │
 │       ▼                                                   │
 │   repository   Spring Data JPA, tenant-scopade queries    │
 │       │                                                   │
@@ -100,7 +116,8 @@ MediTrack är en lagerindelad modulär monolit: en Spring Boot-backend som expon
 │   entity       JPA-mappning, Auditable, @Version          │
 │                                                           │
 │   ai           reorder-agent (Gemini + regel-fallback)    │
-│   tvärgående:  dto · enums · exception · security · config│
+│   security     Spring Security, UserDetailsService, RBAC  │
+│   tvärgående:  dto · enums · exception · config           │
 └───────────────────────────┬─────────────────────────────┘
                             │  JDBC (HikariCP)
                             ▼
@@ -110,7 +127,7 @@ MediTrack är en lagerindelad modulär monolit: en Spring Boot-backend som expon
 └─────────────────────────────────────────────────────────┘
 ```
 
-Paketen speglar lagren rakt av: `controller` tar emot HTTP och delegerar direkt till `service`, som äger all affärslogik och är det enda lagret som rör `repository`. `entity` är JPA-mappningen; `dto` är API-kontraktet (records, frikopplat från entiteterna). `ai` är ett avgränsat hörn för påfyllningsagenten. Tvärgående paket — `enums`, `exception` (global felöversättning), `security` (Spring Security-konfig), `config` (JPA-auditing m.m.) — stödjer alla lager utan att höra hemma i något särskilt.
+Paketen speglar lagren rakt av: `controller` tar emot HTTP och delegerar direkt till `service`, som äger all affärslogik och är det enda lagret som rör `repository`. `entity` är JPA-mappningen; `dto` är API-kontraktet (records, frikopplat från entiteterna). `ai` är ett avgränsat hörn för påfyllningsagenten; `security` håller Spring Security-konfig, `UserDetailsService` och rollgenomdrivning. Tvärgående paket — `enums`, `exception` (global felöversättning), `config` (JPA-auditing m.m.) — stödjer alla lager utan att höra hemma i något särskilt.
 
 Migrationer ägs av Flyway, inte Hibernate: `ddl-auto: validate` betyder att Hibernate jämför entiteterna mot schemat vid uppstart och kraschar vid avvikelse, men aldrig ändrar databasen själv. Schemat har en sanningskälla.
 
@@ -132,12 +149,12 @@ Hela stacken är vald medvetet, inte default. Motiveringar i korthet:
 | **MySQL 8.4** | Senaste LTS. Hemmaplan — beprövade Flyway- och Testcontainers-mönster. Se nedan. |
 | **Flyway** | Versionshanterade, immutabla migrationer = spårbart schema (kritiskt i vård). Enda sanningskällan; Hibernate kör `validate`, aldrig `ddl-auto: update`. |
 | **Hibernate/JPA** | Mogen ORM, integrerar sömlöst med Spring Data. |
-| **Spring Security** | Med från dag 1, inte bolt-on. RBAC är regulatoriskt krav (HSLF-FS 2017:37, separation of duties). |
+| **Spring Security** | Med från dag 1, inte bolt-on. HTTP Basic mot användare i databasen, RBAC genomdrivet per endpoint. RBAC är regulatoriskt krav (HSLF-FS 2017:37, separation of duties). |
 | **Testcontainers** | Integrationstester mot riktig MySQL, inte H2 — H2 ljuger om dialektspecifika saker (JSON, CHECK, FK, radlås). |
 | **Lombok** | Mindre boilerplate i entiteterna; exkluderad ur slutgiltig JAR. |
 | **Vite + React + TypeScript** | Caset namnger React/TS. SPA mot rent JSON-API. Se nedan. |
 | **Tailwind v3** | Utility-klasser direkt i JSX, ingen ramverksinlärning. v3 (inte v4) för stabil, väldokumenterad tooling. |
-| **Egen `useFetch`-hook** | För fyra sidor är TanStack Query/SWR overkill. ~30 rader täcker behovet; byts vid behov när appen växer. |
+| **Egen `useFetch`-hook + `apiFetch`** | För fyra sidor är TanStack Query/SWR overkill. En central `apiFetch` lägger på Basic auth och hanterar 401/403; `useFetch` täcker läsningarna. Byts vid behov när appen växer. |
 | **Gemini (AI-agent)** | Medovias egen LLM — samma logik som React-valet: bygg i den stack ni faktiskt använder. Bakom ett interface, med deterministisk fallback. |
 
 ### MySQL framför Postgres
@@ -207,23 +224,20 @@ Affärsreglerna — state machine, lagerlogik, threshold-beräkning och RBAC —
 
 ### Valbara utökningar (byggda)
 
+- **Rollbaserad åtkomst (RBAC) med separation of duties.** Autentisering via HTTP Basic mot användare i databasen (BCrypt-hashade lösenord, ingen hash exponeras). Tre roller (NURSE, PHARMACIST, ADMIN), genomdrivna i två lager: `@PreAuthorize` på controllern (rollkrav — bara PHARMACIST får bekräfta) och ett eget domänundantag i service-lagret (separation of duties på personnivå — den som skickat en beställning får inte själv bekräfta den, även som apotekare). Båda ger 403. Frontend döljer åtgärder rollen inte får utföra, men det är enbart UX — backend genomdriver oavsett vad klienten visar. `/api/me` exponerar inloggad användares roll till frontend.
 - **AI-driven påfyllningsagent.** Läser lagerposter under tröskel och föreslår påfyllningskvantiteter via Gemini (Medovias LLM). Agenten skapar ett **DRAFT-utkast** som en människa granskar och skickar — den beslutar aldrig själv. Det är separation of duties applicerat på AI: precis som en sjuksköterska inte får bekräfta sin egen beställning, får agenten inte verkställa sitt eget förslag. Bakom ett interface med en deterministisk regel-fallback, så appen fungerar med eller utan Gemini. Vilka läkemedel som är lågt lager och deras saldon kommer alltid från databasen — modellen föreslår bara kvantiteter, den kan inte hitta på vad som finns.
 - **Audit log.** Immutabel logg över vem som gjorde vad och när, med flexibel JSON-kontext per händelse — kritiskt i sjukvårdskontext, designat för både skriv- och läsloggning.
 - **Tenant-isolering.** Systemet är multi-tenant från grunden: varje vårdenhet ser bara sin egen data, även för admin-rollen. Seed-datan innehåller en avsiktligt tom andra enhet för att demonstrera att isoleringen håller.
 
-### Designat men inte på plats
-
-- **Rollbaserad åtkomst (RBAC).** Tre roller (NURSE, PHARMACIST, ADMIN) och separation of duties är designade i datamodell och affärsregler, men auktoriseringen är inte på plats än — `@PreAuthorize` per endpoint och inloggning återstår (`CurrentUserProvider` returnerar tills vidare en fast användare). Spring Security ligger i botten från dag 1; det som återstår är att koppla på genomdrivningen. Nästa iteration.
-
 ### Medvetet utelämnat
 
-E-post-/in-app-notiser och CSV/PDF-export är specificerade som valbara i caset och inte byggda — prioriteringen lades på en solid, väl motiverad kärna plus de utökningar som bäst speglar Medovias riktning (AI) och domänens krav (audit, tenant-isolering). Vad som skulle tillkomma och varför står i avsnitt 8.
+E-post-/in-app-notiser och CSV/PDF-export är specificerade som valbara i caset och inte byggda — prioriteringen lades på en solid, väl motiverad kärna plus de utökningar som bäst speglar Medovias riktning (AI) och domänens krav (audit, tenant-isolering, RBAC). Vad som skulle tillkomma och varför står i avsnitt 8.
 
 ## 7. Kända brister
 
 Ärlig självkritik — det här är vad jag är minst nöjd med och medveten om.
 
-- **RBAC är designad men inte på plats.** Det enskilt största gapet mot en produktionsklar version. Rollerna och separation of duties finns i modellen, men ingen blockeras faktiskt än eftersom inloggning och `@PreAuthorize` inte är inkopplade. Se avsnitt 6.
+- **Autentiseringen är medvetet enkel.** HTTP Basic mot användare i databasen — rätt nivå för ett internt verktyg och håller API:t stateless, men i produktion över publika nät skulle den paras med HTTPS och troligen kompletteras med token-/sessionsbaserad inloggning för webbklienten. Det finns ingen kontolåsning eller rate limiting vid upprepade misslyckade inloggningar, och ingen UI för användaradministration (användare kommer från seed; lägga till eller spärra sker på databasnivå). Själva rollgenomdrivningen och separation of duties är dock på plats och testad.
 
 - **Concurrency-testet täcker inte allt.** Testet bevisar pessimistisk låsning för saldojustering (20 trådar mot riktig MySQL via Testcontainers, deterministiskt förväntat slutsaldo). Leveransflödet skyddas av *samma* lås men har inte ett eget test, och deadlock-scenarier är inte täckta. Viktig distinktion: låsmekanismen är bevisad och gör sitt jobb till rätt kostnad — det är *testtäckningen* som inte är komplett, inte säkerheten. Låset behöver inte förändras för den här skalan.
 
@@ -237,9 +251,9 @@ E-post-/in-app-notiser och CSV/PDF-export är specificerade som valbara i caset 
 
 I prioritetsordning.
 
-**1. Genomföra RBAC.** Byta `CurrentUserProvider`-platshållaren mot en `SecurityContextHolder`-lookup, aktivera `@PreAuthorize` per endpoint enligt rollmatrisen, och bygga inloggning i frontend. Designen är redan på plats — det är genomdrivningen som återstår. Detta är det första jag skulle ta.
+**1. Frontend-formulär** för att skapa och redigera läkemedel och beställningar, med klientvalidering som speglar Bean Validation-reglerna. Plus toast-notiser för success/fel och en bekräftelsedialog före irreversibla actions (t.ex. Avbryt).
 
-**2. Frontend-formulär** för att skapa och redigera läkemedel och beställningar, med klientvalidering som speglar Bean Validation-reglerna. Plus toast-notiser för success/fel och en bekräftelsedialog före irreversibla actions (t.ex. Avbryt).
+**2. Härda autentiseringen.** Token-/sessionsbaserad inloggning för webbklienten (Basic är stateless men skickar credentials vid varje request), kontolåsning/rate limiting vid misslyckade försök, och en UI för användaradministration (skapa/spärra användare, återställ lösenord). Rollgenomdrivningen finns redan — det är skyddet runt själva inloggningen som skulle stärkas.
 
 **3. Notiser och export** — de valbara casetilläggen jag inte hann: e-post/in-app-notis vid lågt lager, och CSV/PDF-export av beställningshistorik.
 
