@@ -28,9 +28,9 @@ VALUES
 -- sig själva (id 1) för cirkelreferens i utgångsläget.
 INSERT IGNORE INTO users (id, care_unit_id, email, name, role, password_hash, active, created_at, created_by, updated_at, updated_by)
 VALUES
-    (1, 1, 'anna.lindberg@meditrack.demo',   'Anna Lindberg',   'ADMIN',      NULL, TRUE, NOW(6), 1, NOW(6), 1),
-    (2, 1, 'erik.svensson@meditrack.demo',   'Erik Svensson',   'PHARMACIST', NULL, TRUE, NOW(6), 1, NOW(6), 1),
-    (3, 1, 'sara.johansson@meditrack.demo',  'Sara Johansson',  'NURSE',      NULL, TRUE, NOW(6), 1, NOW(6), 1);
+    (1, 1, 'anna.lindberg@meditrack.demo',   'Anna Lindberg',   'ADMIN',       '$2b$10$l7KKeqIvcgq531HeK1hGZeA3p3.xQrZHzo5A9.jFWul4TNOda943i', TRUE, NOW(6), 1, NOW(6), 1),
+    (2, 1, 'erik.svensson@meditrack.demo',   'Erik Svensson',   'PHARMACIST',  '$2b$10$l7KKeqIvcgq531HeK1hGZeA3p3.xQrZHzo5A9.jFWul4TNOda943i', TRUE, NOW(6), 1, NOW(6), 1),
+    (3, 1, 'sara.johansson@meditrack.demo',  'Sara Johansson',  'NURSE',       '$2b$10$l7KKeqIvcgq531HeK1hGZeA3p3.xQrZHzo5A9.jFWul4TNOda943i', TRUE, NOW(6), 1, NOW(6), 1);
 
 -- ---------- LÄKEMEDEL ----------
 -- Sju läkemedel i enhet 1, varierande former. Morfin är flaggat

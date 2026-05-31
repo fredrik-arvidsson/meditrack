@@ -1,5 +1,6 @@
 package se.meditrack.exception;
 
+import org.springframework.security.access.AccessDeniedException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,6 +57,26 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiError> handleAccessDenied(AccessDeniedException ex,
+                                                       HttpServletRequest request) {
+        ApiError body = ApiError.of(403, "Forbidden",
+                "Du saknar behörighet för den här åtgärden", request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
+    }
+
+    @ExceptionHandler(SeparationOfDutiesException.class)
+    public ResponseEntity<ApiError> handleSeparationOfDuties(SeparationOfDutiesException ex,
+                                                             HttpServletRequest request) {
+        // Person-nivå separation of duties (samma person får inte utföra
+        // två steg som ska skötas av olika). 403 precis som rollnekandet —
+        // ett brott mot separation of duties är ett åtkomstbeslut, oavsett
+        // om det är roll- eller person-nivå. Meddelandet får följa med (till
+        // skillnad från catch-all): det avslöjar ingen känslig struktur,
+        // bara regeln, och hjälper användaren förstå varför.
+        ApiError body = ApiError.of(403, "Forbidden", ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
+    }
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleUnknown(Exception ex, HttpServletRequest request) {
         // Catch-all: oväntat fel. Logga FULL information för felsökning,

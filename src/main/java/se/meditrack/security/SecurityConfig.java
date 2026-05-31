@@ -3,7 +3,10 @@ package se.meditrack.security;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -12,27 +15,25 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.List;
 
 /**
- * Minimal säkerhetskonfiguration för utvecklingsläge.
+ * Säkerhetskonfiguration: HTTP Basic auth + rollbaserad åtkomst.
  *
- * Auth: i nuvarande iteration släpps alla requests igenom utan
- * autentisering. Detta är medvetet förenklat - en riktig produktion
- * skulle ha rollbaserad åtkomst (NURSE/PHARMACIST/ADMIN) via
- * @PreAuthorize eller endpoint-matchers. Se MEDITRACK_AFFARSREGLER.md
- * avsnitt om rollmatrisen för planerad design.
+ * Auth-modell: HTTP Basic. Varje request bär användarnamn + lösenord i
+ * Authorization-headern. Valt medvetet för att hålla API:t STATELESS
+ * (ingen session, ingen cookie) — konsekvent med resten av designen.
+ * I produktion vore JWT eller OIDC lämpligare (riktig token-hantering,
+ * utloggning), men för att demonstrera rollbaserad auktorisering håller
+ * Basic auth arkitekturen ren.
  *
- * CSRF avstängt eftersom detta är ett stateless JSON-API som
- * konsumeras av en separat React-frontend. CSRF-skyddet är designat
- * för formulär-baserade webbappar med sessions; det passar inte här.
+ * @EnableMethodSecurity slår på @PreAuthorize, så att enskilda endpoints
+ * kan kräva en viss roll (separation of duties — se OrderController).
  *
- * Stateless sessions: ingen JSESSIONID-cookie, varje request står
- * på egen hand. Frontend håller ingen sessionsstate på serversidan.
+ * CSRF avstängt: stateless JSON-API utan session, CSRF-skyddet (designat
+ * för sessionsbaserade formulär-appar) är inte tillämpligt.
  *
- * CORS: tillåter localhost:5173 (Vite dev-server) att anropa
- * backend. För produktion skulle deploy-URL:en läggas till - eller
- * helst skulle frontend och backend serveras från samma origin via
- * en reverse proxy, så CORS inte behövs alls.
+ * CORS: tillåter Vite dev-servern (localhost:5173) att anropa backend.
  */
 @Configuration
+@EnableMethodSecurity
 public class SecurityConfig {
 
     @Bean
@@ -43,8 +44,18 @@ public class SecurityConfig {
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .anyRequest().permitAll());
+                        // CORS preflight (OPTIONS) måste släppas igenom oautentiserat.
+                        .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
+                        // Allt övrigt kräver inloggning. Finkornig rollkontroll
+                        // sker per endpoint med @PreAuthorize.
+                        .anyRequest().authenticated())
+                .httpBasic(basic -> {});
         return http.build();
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
     }
 
     @Bean

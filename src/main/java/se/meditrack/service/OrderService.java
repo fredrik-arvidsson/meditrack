@@ -15,6 +15,7 @@ import se.meditrack.entity.StockMovement;
 import se.meditrack.enums.MovementReason;
 import se.meditrack.enums.OrderStatus;
 import se.meditrack.exception.NotFoundException;
+import se.meditrack.exception.SeparationOfDutiesException;
 import se.meditrack.exception.ValidationException;
 import se.meditrack.repository.CareUnitRepository;
 import se.meditrack.repository.MedicationRepository;
@@ -138,6 +139,16 @@ public class OrderService {
                 order.setSentBy(actorId);
             }
             case CONFIRMED -> {
+                // Separation of duties på person-nivå (HSLF-FS 2017:37):
+                // den som skickade beställningen får inte själv bekräfta den,
+                // även om hen är apotekare. Rollkravet (PHARMACIST) sätts av
+                // @PreAuthorize på controllern; person-kravet hör hemma HÄR,
+                // eftersom det beror på orderns data (sentBy) som controllern
+                // inte har. Två lager: rätt roll OCH rätt person.
+                if (actorId.equals(order.getSentBy())) {
+                    throw new SeparationOfDutiesException(
+                            "Du som skickade beställningen får inte själv bekräfta den");
+                }
                 order.setConfirmedAt(now);
                 order.setConfirmedBy(actorId);
             }

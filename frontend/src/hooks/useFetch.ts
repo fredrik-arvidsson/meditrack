@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-
-const API_BASE = "http://localhost:8080";
+import { apiFetch } from "../api";
 
 export function useFetch<T>(path: string) {
     const [data, setData] = useState<T | null>(null);
@@ -9,17 +8,10 @@ export function useFetch<T>(path: string) {
 
     useEffect(() => {
         let cancelled = false;
-
         setLoading(true);
         setError(null);
 
-        fetch(`${API_BASE}${path}`)
-            .then((response) => {
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                return response.json();
-            })
+        apiFetch<T>(path)
             .then((json) => {
                 if (!cancelled) {
                     setData(json);
@@ -28,7 +20,7 @@ export function useFetch<T>(path: string) {
             })
             .catch((err) => {
                 if (!cancelled) {
-                    setError(err.message);
+                    setError(err instanceof Error ? err.message : "Något gick fel");
                     setLoading(false);
                 }
             });

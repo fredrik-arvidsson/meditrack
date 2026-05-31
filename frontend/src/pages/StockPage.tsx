@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useFetch } from "../hooks/useFetch";
+import { apiFetch } from "../api";
 import type { StockItem } from "../types/medication";
-
-const API_BASE = "http://localhost:8080";
 
 // Svaret från reorder-agenten. Matchar ReorderResult på backend.
 type ReorderResult = {
@@ -27,23 +26,10 @@ function StockPage() {
         setReorderError(null);
         setReorderResult(null);
         try {
-            const response = await fetch(
-                `${API_BASE}/api/orders/suggest-reorder`,
+            const result = await apiFetch<ReorderResult>(
+                `/api/orders/suggest-reorder`,
                 { method: "POST" }
             );
-            if (!response.ok) {
-                let message = `HTTP ${response.status}`;
-                try {
-                    const body = await response.json();
-                    if (body?.message) {
-                        message = body.message;
-                    }
-                } catch {
-                    // svaret var inte JSON - behåll status-meddelandet
-                }
-                throw new Error(message);
-            }
-            const result: ReorderResult = await response.json();
             setReorderResult(result);
             // Lagret kan ha ändrats av andra skäl - hämta om för säkerhets skull.
             setRefreshKey((k) => k + 1);

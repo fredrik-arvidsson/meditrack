@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useFetch } from "../hooks/useFetch";
+import { apiFetch } from "../api";
+import { useAuth } from "../AuthContext";
 import StatusBadge from "../components/StatusBadge";
 import type { Order, OrderStatus } from "../types/medication";
-
-const API_BASE = "http://localhost:8080";
 
 type Action = {
     label: string;
@@ -40,6 +40,7 @@ function OrderDetailPage() {
     const [refreshKey, setRefreshKey] = useState(0);
     const [actionLoading, setActionLoading] = useState(false);
     const [actionError, setActionError] = useState<string | null>(null);
+    const { user } = useAuth();
 
     const { data, loading, error } = useFetch<Order>(
         `/api/orders/${id}?_=${refreshKey}`
@@ -49,24 +50,10 @@ function OrderDetailPage() {
         setActionLoading(true);
         setActionError(null);
         try {
-            const response = await fetch(
-                `${API_BASE}/api/orders/${id}/${endpoint}`,
-                { method: "POST" }
-            );
-            if (!response.ok) {
-                let message = `HTTP ${response.status}`;
-                try {
-                    const body = await response.json();
-                    if (body?.message) {
-                        message = body.message;
-                    }
-                } catch {
-                    // svaret var inte JSON - behåll status-meddelandet
-                }
-                throw new Error(message);
-            }
+            await apiFetch(`/api/orders/${id}/${endpoint}`, { method: "POST" });
             setRefreshKey((k) => k + 1);
         } catch (err) {
+            // apiFetch kastar serverns meddelande (t.ex. separation of duties).
             setActionError(err instanceof Error ? err.message : "Okänt fel");
         } finally {
             setActionLoading(false);
@@ -86,7 +73,14 @@ function OrderDetailPage() {
         );
     }
 
-    const actions = actionsFor(data.status);
+    const actions = actionsFor(data.status).filter((action) => {
+        // "Bekräfta" är apotekarens uppgift (separation of duties). Dölj den
+        // för andra roller — UX, inte säkerhet: backend nekar ändå med 403.
+        if (action.endpoint === "confirm" && user?.role !== "PHARMACIST") {
+            return false;
+        }
+        return true;
+    });
 
     return (
         <div>

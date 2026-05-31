@@ -1,5 +1,6 @@
 package se.meditrack.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -62,6 +63,7 @@ public class OrderController {
         return orderService.updateStatus(id, new UpdateOrderStatusRequest(OrderStatus.SENT));
     }
 
+    @PreAuthorize("hasRole('PHARMACIST')")
     @PostMapping("/{id}/confirm")
     public OrderResponse confirm(@PathVariable Long id) {
         return orderService.updateStatus(id, new UpdateOrderStatusRequest(OrderStatus.CONFIRMED));
