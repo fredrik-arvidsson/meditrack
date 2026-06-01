@@ -119,19 +119,6 @@ public class StockService {
     }
 
     /**
-     * Tar emot en leverans: ökar saldot för en lagerpost. Den saldokritiska
-     * operationen — pessimistisk låsning (FOR UPDATE) serialiserar samtidiga
-     * leveranser. Anropas från OrderService när en order går till DELIVERED.
-     */
-    public void receiveDelivery(Long stockItemId, int quantity, Long orderId) {
-        Long careUnitId = currentUser.getCurrentCareUnitId();
-        StockItem stockItem = stockItemRepository.findByIdAndCareUnitIdForUpdate(stockItemId, careUnitId)
-                .orElseThrow(() -> new NotFoundException("Lagerpost hittades inte: " + stockItemId));
-
-        applyMovement(stockItem, quantity, MovementReason.DELIVERY, orderId, "Leverans av order " + orderId);
-    }
-
-    /**
      * Den enda vägen att ändra ett saldo. Uppdaterar quantity OCH skapar en
      * StockMovement med quantity_after — atomärt, inom samma transaktion.
      * Saldo och historik kan aldrig glida isär.
