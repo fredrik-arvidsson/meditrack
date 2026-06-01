@@ -1,6 +1,14 @@
 import { NavLink } from "react-router-dom";
+import { useAuth } from "../AuthContext";
+
+const roleLabel: Record<string, string> = {
+    NURSE: "Sjuksköterska",
+    PHARMACIST: "Apotekare",
+    ADMIN: "Administratör",
+};
 
 function Navbar() {
+    const { user } = useAuth();
     const baseClasses = "px-4 py-2 text-sm font-medium transition-colors";
     const activeClasses = "text-slate-900 border-b-2 border-slate-900";
     const inactiveClasses = "text-slate-600 hover:text-slate-900";
@@ -37,6 +45,11 @@ function Navbar() {
                         >
                             Beställningar
                         </NavLink>
+                        {user && (
+                            <span className="ml-4 pl-4 border-l border-slate-200 text-sm text-slate-500">
+                                Inloggad som {user.name} · {roleLabel[user.role]}
+                            </span>
+                        )}
                     </div>
                 </div>
             </div>
