@@ -54,8 +54,7 @@ docker-compose.override.yml
 *.swo
 *~
 
-# Internt arbetsdokument — inte för publikt repo
-MEDITRACK_MOTIVERINGAR.md
+# Privata filer
 Presentation.pdf
 
 
