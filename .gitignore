@@ -56,5 +56,6 @@ docker-compose.override.yml
 
 # Internt arbetsdokument — inte för publikt repo
 MEDITRACK_MOTIVERINGAR.md
+Presentation.pdf
 
 
