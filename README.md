@@ -2,7 +2,7 @@
 
 Internt verktyg för läkemedelshantering och beställningsflöden på svenska vårdenheter. Bygger ut den manuella e-post-och-Excel-processen till ett spårbart system med statusflöde, varningar för låga lager och en datamodell som speglar verkliga relationer.
 
-Byggt som case för Medovia (Faraz Naeem) under perioden 27 maj – 3 juni 2026.
+Byggt som case för Medovia under perioden 27 maj – 3 juni 2026.
 
 ## Snabbstart
 
@@ -176,7 +176,7 @@ Min huvudsakliga frontend-erfarenhet ligger på server-renderade vyer (Thymeleaf
 
 ## 5. Datamodell
 
-Åtta entiteter som speglar verkliga relationer i läkemedelslogistiken. Fullständig modell med alla fält, constraints och designresonemang finns i [`MEDITRACK_DATAMODELL.md`](./MEDITRACK_DATAMODELL.md); här är överblicken.
+Åtta entiteter som speglar verkliga relationer i läkemedelslogistiken. Fullständig modell med alla fält, constraints och designresonemang finns i [`DATAMODELL.md`](./DATAMODELL.md); här är överblicken.
 
 ```
 CareUnit (vårdenhet, tenant-rot)
@@ -207,7 +207,7 @@ Centrala designval:
 - **Soft-delete + anonymisering på User.** `deleted_at` + `anonymized_at` istället för hård radering (GDPR art. 17, samtidigt som referensintegritet till historik bevaras).
 - **`controlled_substance` på Medication.** Flaggar narkotika (HSLF-FS 2017:37), designat för framtida dubbelsignering.
 
-Affärsreglerna — state machine, lagerlogik, threshold-beräkning och RBAC — beskrivs i [`MEDITRACK_AFFARSREGLER.md`](./MEDITRACK_AFFARSREGLER.md).
+Affärsreglerna — state machine, lagerlogik, threshold-beräkning och RBAC — beskrivs i [`AFFARSREGLER.md`](./AFFARSREGLER.md). En kortare sammanfattning av de viktigaste tekniska valen finns i [`DESIGNBESLUT.md`](./DESIGNBESLUT.md).
 
 ## 6. Funktioner
 
