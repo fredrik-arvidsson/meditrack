@@ -12,6 +12,13 @@ Förutsättningar:
 - Docker Desktop (för MySQL-instansen)
 - Maven 3.9+ (eller använd den medföljande `./mvnw`)
 
+### 0. Klona projektet
+
+```bash
+git clone https://github.com/fredrik-arvidsson/meditrack.git
+cd meditrack
+```
+
 ### 1. Starta databasen
 
 ```bash
@@ -267,6 +274,8 @@ I prioritetsordning.
 - **Låsstrategin omprövas.** Vid en enhet är pessimistisk låsning rätt — väntekostnaden realiseras nästan aldrig och skyddet är värt det där felet vore allvarligast (patientsäkerhet). Vid 50 enheter och hög samtidighet skulle jag ompröva: optimistisk låsning med retry för lågkonflikt-operationer, pessimistisk reserverad strikt för leverans. Rätt mekanism beror på faktisk konfliktfrekvens, som man bör mäta innan man väljer.
 
 **5. AI-agenten vidare.** Strukturerad AI-metadata för audit (modell, prompt-version, tidpunkt), striktare påfyllningslogik för narkotikaklassade läkemedel (`controlled_substance`), och eventuellt schemalagda utkast — men då blir den mänskliga granskningsgränsen viktigare, inte mindre.
+
+**6. Aktör per statusövergång i UI:t.** Vem som skapade, skickade, bekräftade och levererade en order spåras redan i datamodellen (`sent_by`, `confirmed_by`, `delivered_by`) — det är den datan separation of duties bygger på. Den exponeras dock inte i `OrderResponse` ännu, så orderdetaljvyn visar *när* varje övergång skedde men inte *vem* som utförde den. Med mer tid hade jag lagt till aktör-fälten i API-svaret och visat dem i tidslinjen — ett naturligt komplement till audit-loggen.
 
 ---
 
