@@ -2,7 +2,7 @@
 
 Internt verktyg för läkemedelshantering och beställningsflöden på svenska vårdenheter. Bygger ut den manuella e-post-och-Excel-processen till ett spårbart system med statusflöde, varningar för låga lager och en datamodell som speglar verkliga relationer.
 
-Byggt som case för Medovia under perioden 27 maj – 3 juni 2026.
+Byggt som case för Medovia under perioden 27 maj – 4 juni 2026.
 
 ## Snabbstart
 
@@ -73,7 +73,7 @@ Rollen styr vad du får göra — bara en apotekare (PHARMACIST) kan bekräfta e
 
 ### 4. Verifiera
 
-Logga in (t.ex. `sara.johansson@meditrack.demo` / `demo1234`). Frontend ska visa sju läkemedel i en tabell (Morfin är märkt som narkotika). Klicka på "Lager" — sju lagerposter, två markerade under tröskel (Paracetamol och Salbutamol). Klicka på "Beställningar": ORD-DEMO0001 är **Skickad**, ORD-DEMO0002 är **Levererad**.
+Logga in (t.ex. `sara.johansson@meditrack.demo` / `demo1234`). Frontend ska visa sju läkemedel i en tabell (Morfin är märkt som narkotika). Sök på "para" eller välj en form i filtret ovanför tabellen för att smalna av listan. Klicka på "Lager" — sju lagerposter, två markerade under tröskel (Paracetamol och Salbutamol). Klicka på "Beställningar": ORD-DEMO0001 är **Skickad**, ORD-DEMO0002 är **Levererad**.
 
 Öppna "Visa detaljer" på ORD-DEMO0001. Som **NURSE** (Sara) ser du *ingen* Bekräfta-knapp — det är rolldöljningen i UI:t. Ladda om sidan för att logga ut (credentials ligger i minnet, så en omladdning återgår till inloggning), och logga in som `erik.svensson@meditrack.demo` (PHARMACIST). Öppna samma order: nu finns Bekräfta. Klicka "Bekräfta", sedan "Leverera", och se status, tidslinje och lagersaldo uppdateras live (leveransen ökar saldot för Amoxicillin och Natriumklorid).
 
@@ -215,8 +215,8 @@ Affärsreglerna — state machine, lagerlogik, threshold-beräkning och RBAC —
 
 **Läkemedelsregister**
 - Lista läkemedel med namn, ATC-kod, form, styrka och aktuellt lagersaldo
-- Lägg till, redigera och ta bort läkemedel (radering är soft-delete — `active = false` — eftersom läkemedel med historik aldrig hård-raderas)
-- Sök och filtrera på namn, ATC-kod eller form
+- Lägg till, redigera och ta bort läkemedel (radering är soft-delete — `active = false` — eftersom läkemedel med historik aldrig hård-raderas; listan filtrerar bort inaktiva)
+- Sök på namn och ATC-kod samt filtrera på form — allt serverside via en JPQL-query med valfria parametrar, så det skalar med antalet poster istället för att filtrera i minnet
 
 **Beställningsflöde**
 - Skapa beställning med en eller flera rader (läkemedel + kvantitet)
@@ -246,9 +246,11 @@ E-post-/in-app-notiser och CSV/PDF-export är specificerade som valbara i caset 
 
 - **Autentiseringen är medvetet enkel.** HTTP Basic mot användare i databasen — rätt nivå för ett internt verktyg och håller API:t stateless, men i produktion över publika nät skulle den paras med HTTPS och troligen kompletteras med token-/sessionsbaserad inloggning för webbklienten. Det finns ingen kontolåsning eller rate limiting vid upprepade misslyckade inloggningar, och ingen UI för användaradministration (användare kommer från seed; lägga till eller spärra sker på databasnivå). Själva rollgenomdrivningen och separation of duties är dock på plats och testad.
 
-- **Concurrency-testet täcker inte allt.** Testet bevisar pessimistisk låsning för saldojustering (20 trådar mot riktig MySQL via Testcontainers, deterministiskt förväntat slutsaldo). Leveransflödet skyddas av *samma* lås men har inte ett eget test, och deadlock-scenarier är inte täckta. Viktig distinktion: låsmekanismen är bevisad och gör sitt jobb till rätt kostnad — det är *testtäckningen* som inte är komplett, inte säkerheten. Låset behöver inte förändras för den här skalan.
+- **Concurrency-testet täcker inte allt.** Testet kör 20 trådar mot riktig MySQL (Testcontainers) och verifierar att alla 20 saldojusteringar lyckas; den pessimistiska låsningen serialiserar dem (`SELECT ... FOR UPDATE`), vilket syns på att saldot räknas ned monotont utan tappade uppdateringar. Två ärliga begränsningar: assertionen kontrollerar *antalet* lyckade justeringar, inte slutsaldot explicit — att även asserta att saldot landar på start − 20 vore en starkare kontroll. Och leveransflödet skyddas av *samma* lås men har inget eget test; deadlock-scenarier är inte täckta. Viktig distinktion: låsmekanismen är bevisad och gör sitt jobb till rätt kostnad — det är *testtäckningen* som inte är komplett, inte säkerheten. Låset behöver inte förändras för den här skalan.
 
-- **Inga frontend-formulär.** Lägg till/redigera läkemedel och skapa beställning finns som API-endpoints och är testade med curl, men har inget UI än — frontend visar och muterar status, men skapar inte nya resurser via formulär. Medvetet bortval för att skydda tid (designval, inte glömska).
+- **Beställningar skapas inte via UI än.** Läkemedel kan skapas, redigeras och tas bort via formulär i frontend (med klientvalidering som speglar Bean Validation, och fältfel från backend som visas per fält). Att *skapa* en ny beställning med orderrader finns däremot bara som API-endpoint, testad med curl — frontend visar och muterar beställningars status men har inget formulär för att lägga en ny order. Medvetet bortval för att skydda tid.
+
+- **Sökningen hämtar om vid varje tangenttryck.** Sök/filter-fältet utlöser ett nytt API-anrop för varje ändring. För demons datamängd är det omärkbart, men vid hundratals poster och många användare vore en debounce (vänta ~300 ms efter sista tangenttryck) rätt — det skulle minska antalet anrop utan att märkas i UX:en. Medvetet utelämnat som en optimering som inte behövs vid den här skalan.
 
 - **AI-utkast persisteras inte med strukturerad metadata.** Förslaget sparas som en vanlig order med en notering om källan ("Gemini" respektive "Regelbaserad fallback"), men inte som strukturerad metadata (modell, prompt-version, tidpunkt). I en produktionskontext med audit-krav för AI-beslut vore det värt att spåra.
 
@@ -258,7 +260,7 @@ E-post-/in-app-notiser och CSV/PDF-export är specificerade som valbara i caset 
 
 I prioritetsordning.
 
-**1. Frontend-formulär** för att skapa och redigera läkemedel och beställningar, med klientvalidering som speglar Bean Validation-reglerna. Plus toast-notiser för success/fel och en bekräftelsedialog före irreversibla actions (t.ex. Avbryt).
+**1. Resterande frontend-formulär.** Läkemedel kan skapas, redigeras och tas bort via UI, och listan har sök/filter; det som återstår är ett formulär för att *skapa* en beställning (med orderrader), med klientvalidering som speglar Bean Validation även där. Plus toast-notiser för success/fel och bekräftelsedialog före fler irreversibla actions (borttagning av läkemedel har redan en `window.confirm`; t.ex. Avbryt-övergången har ingen ännu).
 
 **2. Härda autentiseringen.** Token-/sessionsbaserad inloggning för webbklienten (Basic är stateless men skickar credentials vid varje request), kontolåsning/rate limiting vid misslyckade försök, och en UI för användaradministration (skapa/spärra användare, återställ lösenord). Rollgenomdrivningen finns redan — det är skyddet runt själva inloggningen som skulle stärkas.
 
