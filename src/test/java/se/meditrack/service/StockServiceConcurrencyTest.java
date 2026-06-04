@@ -2,6 +2,10 @@ package se.meditrack.service;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.context.SecurityContextImpl;
 import se.meditrack.dto.AdjustStockRequest;
 import se.meditrack.entity.CareUnit;
 import se.meditrack.entity.Medication;
@@ -12,6 +16,7 @@ import se.meditrack.repository.CareUnitRepository;
 import se.meditrack.repository.MedicationRepository;
 import se.meditrack.repository.StockItemRepository;
 
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -56,6 +61,14 @@ class StockServiceConcurrencyTest extends AbstractIntegrationTest {
         // Setup: skapa egen testdata sa vi inte paverkar seed
         Long stockItemId = createTestStockItem();
 
+        // SecurityContextHolder använder MODE_THREADLOCAL (default), så varje
+        // tråd i poolen behöver en egen SecurityContext med en autentiserad
+        // användare. Vi återanvänder seed-användaren anna.lindberg som tillhör
+        // care_unit 1 — samma enhet som testdatan skapas under.
+        SecurityContext securityContext = new SecurityContextImpl(
+                new UsernamePasswordAuthenticationToken(
+                        "anna.lindberg@meditrack.demo", null, List.of()));
+
         // Concurrency: N tradar gor adjustStock(-1) samtidigt
         ExecutorService pool = Executors.newFixedThreadPool(THREAD_COUNT);
         CountDownLatch startLatch = new CountDownLatch(1);
@@ -66,6 +79,7 @@ class StockServiceConcurrencyTest extends AbstractIntegrationTest {
         for (int i = 0; i < THREAD_COUNT; i++) {
             pool.submit(() -> {
                 try {
+                    SecurityContextHolder.setContext(securityContext);
                     startLatch.await();
                     stockService.adjustStock(stockItemId,
                             new AdjustStockRequest(-1, MovementReason.CORRECTION, "concurrency-test"));
@@ -73,6 +87,7 @@ class StockServiceConcurrencyTest extends AbstractIntegrationTest {
                 } catch (Exception e) {
                     failures.incrementAndGet();
                 } finally {
+                    SecurityContextHolder.clearContext();
                     doneLatch.countDown();
                 }
             });
@@ -102,10 +117,10 @@ class StockServiceConcurrencyTest extends AbstractIntegrationTest {
 
     /**
      * Skapar testdata under den seedade care-unit 1 (Vardcentralen Norr).
-     * Vi anvander seed-care-unit eftersom CurrentUserProvider just nu ar
-     * en platshallare som returnerar careUnitId=1. Att skapa egen care-unit
-     * skulle gora att tenant-filtrering blockerar testet - service hittar
-     * inte stock_itemet under "fel" care-unit.
+     * Vi anvander seed-care-unit eftersom CurrentUserProvider laser
+     * careUnitId fran den autentiserade anvandaren (anna.lindberg), som
+     * tillhor care_unit 1. Att skapa en egen care-unit skulle gora att
+     * tenant-filtrering blockerar testet.
      *
      * Lakemedel och stock_item ar nyskapade per testkorning - vi paverkar
      * inte seedat lakemedel-data.
