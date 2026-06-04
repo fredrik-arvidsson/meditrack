@@ -7,6 +7,7 @@ import se.meditrack.dto.MedicationResponse;
 import se.meditrack.dto.UpdateMedicationRequest;
 import se.meditrack.entity.CareUnit;
 import se.meditrack.entity.Medication;
+import se.meditrack.enums.MedicationForm;
 import se.meditrack.exception.NotFoundException;
 import se.meditrack.repository.CareUnitRepository;
 import se.meditrack.repository.MedicationRepository;
@@ -43,6 +44,21 @@ public class MedicationService {
     public List<MedicationResponse> findAll() {
         Long careUnitId = currentUser.getCurrentCareUnitId();
         return medicationRepository.findAllByCareUnitIdAndActiveTrue(careUnitId).stream()
+                .map(MedicationResponse::from)
+                .toList();
+    }
+
+    /**
+     * Sök och filtrera aktiva läkemedel inom den inloggade användarens vårdenhet.
+     * Båda parametrarna är valfria: q söker i namn och ATC-kod (case-insensitive
+     * delsträng), form filtrerar på exakt läkemedelsform. Tomma strängar
+     * normaliseras till null så att "inget sökord" och "tom ruta" behandlas lika.
+     */
+    @Transactional(readOnly = true)
+    public List<MedicationResponse> search(String q, MedicationForm form) {
+        Long careUnitId = currentUser.getCurrentCareUnitId();
+        String normalizedQ = (q == null || q.isBlank()) ? null : q.trim();
+        return medicationRepository.search(careUnitId, normalizedQ, form).stream()
                 .map(MedicationResponse::from)
                 .toList();
     }

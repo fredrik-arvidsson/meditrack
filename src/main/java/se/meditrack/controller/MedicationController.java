@@ -10,10 +10,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import se.meditrack.dto.CreateMedicationRequest;
 import se.meditrack.dto.MedicationResponse;
 import se.meditrack.dto.UpdateMedicationRequest;
+import se.meditrack.enums.MedicationForm;
 import se.meditrack.service.MedicationService;
 
 import java.util.List;
@@ -24,9 +26,6 @@ import java.util.List;
  *
  * Alla endpoints är implicit tenant-scoped: servicen hämtar careUnitId
  * från CurrentUserProvider, klienten behöver inte (och får inte) skicka det.
- *
- * Auth saknas än så länge — Spring Securitys default-form-login är på,
- * men ingen rollkontroll. Läggs till i security-lagret senare.
  */
 @RestController
 @RequestMapping("/api/medications")
@@ -38,9 +37,20 @@ public class MedicationController {
         this.medicationService = medicationService;
     }
 
+    /**
+     * Lista läkemedel, med valfri sökning och filtrering.
+     *   - q:    fritextsökning i namn och ATC-kod (valfri)
+     *   - form: filtrera på läkemedelsform (valfri)
+     * Utan parametrar returneras alla aktiva läkemedel i vårdenheten.
+     */
     @GetMapping
-    public List<MedicationResponse> findAll() {
-        return medicationService.findAll();
+    public List<MedicationResponse> findAll(
+            @RequestParam(name = "q", required = false) String q,
+            @RequestParam(name = "form", required = false) MedicationForm form) {
+        if (q == null && form == null) {
+            return medicationService.findAll();
+        }
+        return medicationService.search(q, form);
     }
 
     @GetMapping("/{id}")

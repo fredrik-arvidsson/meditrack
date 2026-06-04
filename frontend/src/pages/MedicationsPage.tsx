@@ -4,15 +4,41 @@ import { apiFetch } from "../api";
 import type { Medication } from "../types/medication";
 import MedicationForm from "../components/MedicationForm";
 
+// Läkemedelsformer som kan filtreras på. Matchar backend-enumet MedicationForm.
+// "" = inget filter (alla former).
+const FORM_OPTIONS: { value: string; label: string }[] = [
+    { value: "", label: "Alla former" },
+    { value: "TABLET", label: "Tablett" },
+    { value: "INJECTION", label: "Injektion" },
+    { value: "SOLUTION", label: "Lösning" },
+    { value: "CREAM", label: "Kräm" },
+    { value: "INHALATION", label: "Inhalation" },
+    { value: "OINTMENT", label: "Salva" },
+    { value: "DROPS", label: "Droppar" },
+    { value: "SUPPOSITORY", label: "Suppositorium" },
+    { value: "PATCH", label: "Plåster" },
+];
+
 function MedicationsPage() {
     const [refreshKey, setRefreshKey] = useState(0);
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [editingMedication, setEditingMedication] = useState<Medication | null>(null);
     const [deleteError, setDeleteError] = useState<string | null>(null);
 
-    const { data, loading, error } = useFetch<Medication[]>(
-        `/api/medications?_=${refreshKey}`
-    );
+    // Sök- och filtertillstånd. Ändringar här bygger en ny URL, vilket får
+    // useFetch att hämta om automatiskt (path ligger i dess dependency-array).
+    const [query, setQuery] = useState("");
+    const [formFilter, setFormFilter] = useState("");
+
+    // Bygg query-strängen. Bara icke-tomma parametrar tas med. refreshKey
+    // tvingar om-fetch efter create/edit/delete (cache-bust).
+    const params = new URLSearchParams();
+    if (query.trim()) params.set("q", query.trim());
+    if (formFilter) params.set("form", formFilter);
+    params.set("_", String(refreshKey));
+    const path = `/api/medications?${params.toString()}`;
+
+    const { data, loading, error } = useFetch<Medication[]>(path);
 
     function handleSaved() {
         setShowCreateForm(false);
@@ -39,19 +65,7 @@ function MedicationsPage() {
     }
 
     const isFormOpen = showCreateForm || editingMedication !== null;
-
-    if (loading) {
-        return <p className="text-slate-600">Laddar läkemedel...</p>;
-    }
-
-    if (error) {
-        return (
-            <div className="rounded-md bg-red-50 border border-red-200 p-4">
-                <p className="text-red-900 font-medium">Kunde inte hämta läkemedel</p>
-                <p className="text-red-700 text-sm mt-1">{error}</p>
-            </div>
-        );
-    }
+    const hasActiveFilter = query.trim() !== "" || formFilter !== "";
 
     return (
         <div>
@@ -63,6 +77,42 @@ function MedicationsPage() {
                         className="px-4 py-2 text-sm font-medium rounded-md bg-slate-900 text-white hover:bg-slate-800"
                     >
                         Lägg till läkemedel
+                    </button>
+                )}
+            </div>
+
+            {/* Sök och filtrera. Söker i namn och ATC-kod via backend (?q=),
+          filtrerar på form (?form=). Filtreringen sker serverside. */}
+            <div className="flex flex-col sm:flex-row gap-3 mb-4">
+                <input
+                    type="text"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Sök på namn eller ATC-kod..."
+                    className="flex-1 px-3 py-2 text-sm rounded-md border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-400"
+                    aria-label="Sök läkemedel"
+                />
+                <select
+                    value={formFilter}
+                    onChange={(e) => setFormFilter(e.target.value)}
+                    className="px-3 py-2 text-sm rounded-md border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-slate-400"
+                    aria-label="Filtrera på form"
+                >
+                    {FORM_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                        </option>
+                    ))}
+                </select>
+                {hasActiveFilter && (
+                    <button
+                        onClick={() => {
+                            setQuery("");
+                            setFormFilter("");
+                        }}
+                        className="px-3 py-2 text-sm font-medium rounded-md bg-white text-slate-700 border border-slate-300 hover:bg-slate-50"
+                    >
+                        Rensa
                     </button>
                 )}
             </div>
@@ -86,6 +136,13 @@ function MedicationsPage() {
                 </div>
             )}
 
+            {error && (
+                <div className="rounded-md bg-red-50 border border-red-200 p-4 mb-4">
+                    <p className="text-red-900 font-medium">Kunde inte hämta läkemedel</p>
+                    <p className="text-red-700 text-sm mt-1">{error}</p>
+                </div>
+            )}
+
             <div className="bg-white rounded-md border border-slate-200 overflow-hidden">
                 <table className="w-full text-sm">
                     <thead className="bg-slate-50 text-left">
@@ -99,7 +156,23 @@ function MedicationsPage() {
                     </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200">
-                    {data?.map((med) => (
+                    {loading && (
+                        <tr>
+                            <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                                Laddar läkemedel...
+                            </td>
+                        </tr>
+                    )}
+                    {!loading && data?.length === 0 && (
+                        <tr>
+                            <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                                {hasActiveFilter
+                                    ? "Inga läkemedel matchar din sökning."
+                                    : "Inga läkemedel registrerade än."}
+                            </td>
+                        </tr>
+                    )}
+                    {!loading && data?.map((med) => (
                         <tr key={med.id} className="hover:bg-slate-50">
                             <td className="px-4 py-3 font-medium text-slate-900">
                                 {med.name}
