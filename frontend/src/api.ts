@@ -1,5 +1,15 @@
 const API_BASE = "http://localhost:8080";
 
+export type FieldError = { field: string; message: string };
+
+export class ApiValidationError extends Error {
+    fieldErrors: FieldError[];
+    constructor(message: string, fieldErrors: FieldError[]) {
+        super(message);
+        this.fieldErrors = fieldErrors;
+    }
+}
+
 // Credentials hålls i minnet (modulnivå), satt vid inloggning. Inte i
 // localStorage: för en intern demo räcker minneslagring, och vi slipper
 // exponera lösenord i webbläsarlagring. Vid sidladdning är man utloggad.
@@ -31,9 +41,12 @@ export function setAuthErrorHandler(handler: () => void) {
  */
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
     const headers: Record<string, string> = {
-        "Content-Type": "application/json",
         ...(options.headers as Record<string, string> | undefined),
     };
+    // Sätt Content-Type bara när det finns en body att skicka.
+    if (options.body) {
+        headers["Content-Type"] = headers["Content-Type"] ?? "application/json";
+    }
     if (authHeader) {
         headers["Authorization"] = authHeader;
     }
@@ -52,13 +65,21 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
         try {
             const body = await response.json();
             if (body && body.message) message = body.message;
-        } catch {
+            if (body && Array.isArray(body.fieldErrors)) {
+                throw new ApiValidationError(message, body.fieldErrors);
+            }
+        } catch (parseErr) {
+            if (parseErr instanceof ApiValidationError) throw parseErr;
             // ingen JSON-kropp — behåll generiskt meddelande
         }
         throw new Error(message);
     }
 
-    // 204 No Content eller tom kropp → returnera null som T.
+    // 204 No Content → inget att parsa, returnera null direkt.
+    if (response.status === 204) {
+        return null as T;
+    }
+
     const text = await response.text();
     return (text ? JSON.parse(text) : null) as T;
 }

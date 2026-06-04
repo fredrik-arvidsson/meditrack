@@ -1,5 +1,18 @@
 export type MedicationForm = "TABLET" | "INJECTION" | "SOLUTION" | "INHALATION";
 
+export type CreateMedicationRequest = {
+    name: string;
+    atcCode: string;
+    form: MedicationForm;
+    strength: string;
+    unit: string;
+    controlledSubstance: boolean;
+};
+
+export type UpdateMedicationRequest = CreateMedicationRequest & {
+    active: boolean;
+};
+
 export type Medication = {
     id: number;
     name: string;
