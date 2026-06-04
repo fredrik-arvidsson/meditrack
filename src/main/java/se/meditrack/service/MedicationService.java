@@ -42,7 +42,7 @@ public class MedicationService {
     @Transactional(readOnly = true)
     public List<MedicationResponse> findAll() {
         Long careUnitId = currentUser.getCurrentCareUnitId();
-        return medicationRepository.findAllByCareUnitId(careUnitId).stream()
+        return medicationRepository.findAllByCareUnitIdAndActiveTrue(careUnitId).stream()
                 .map(MedicationResponse::from)
                 .toList();
     }
