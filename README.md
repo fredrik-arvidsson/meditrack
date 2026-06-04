@@ -75,6 +75,8 @@ Rollen styr vad du får göra — bara en apotekare (PHARMACIST) kan bekräfta e
 
 Logga in (t.ex. `sara.johansson@meditrack.demo` / `demo1234`). Frontend ska visa sju läkemedel i en tabell (Morfin är märkt som narkotika). Sök på "para" eller välj en form i filtret ovanför tabellen för att smalna av listan. Klicka på "Lager" — sju lagerposter, två markerade under tröskel (Paracetamol och Salbutamol). Klicka på "Beställningar": ORD-DEMO0001 är **Skickad**, ORD-DEMO0002 är **Levererad**.
 
+Klicka "Skapa beställning" för att lägga en ny order: välj ett eller flera läkemedel med kvantitet, spara, och se den dyka upp i listan som **Utkast**.
+
 Öppna "Visa detaljer" på ORD-DEMO0001. Som **NURSE** (Sara) ser du *ingen* Bekräfta-knapp — det är rolldöljningen i UI:t. Ladda om sidan för att logga ut (credentials ligger i minnet, så en omladdning återgår till inloggning), och logga in som `erik.svensson@meditrack.demo` (PHARMACIST). Öppna samma order: nu finns Bekräfta. Klicka "Bekräfta", sedan "Leverera", och se status, tidslinje och lagersaldo uppdateras live (leveransen ökar saldot för Amoxicillin och Natriumklorid).
 
 Backend genomdriver rollen oavsett vad UI:t visar: ett anrop mot bekräfta-endpointen som NURSE avvisas med 403, även om knappen skulle tvingas fram. Och separation of duties gäller på personnivå — den som skickat en beställning kan inte bekräfta den ens som apotekare.
@@ -219,7 +221,7 @@ Affärsreglerna — state machine, lagerlogik, threshold-beräkning och RBAC —
 - Sök på namn och ATC-kod samt filtrera på form — allt serverside via en JPQL-query med valfria parametrar, så det skalar med antalet poster istället för att filtrera i minnet
 
 **Beställningsflöde**
-- Skapa beställning med en eller flera rader (läkemedel + kvantitet)
+- Skapa beställning via UI med en eller flera rader (läkemedel + kvantitet), med klientvalidering som speglar backend
 - Statusflöde som state machine: Utkast → Skickad → Bekräftad → Levererad, plus Avbruten från icke-terminala lägen
 - Övergångar kan inte hoppa över steg; statusen sätts alltid serverside, aldrig från klienten
 - Beställningshistorik per vårdenhet, med tidsstämpel och aktör för varje övergång
@@ -248,9 +250,9 @@ E-post-/in-app-notiser och CSV/PDF-export är specificerade som valbara i caset 
 
 - **Concurrency-testet täcker inte allt.** Testet kör 20 trådar mot riktig MySQL (Testcontainers) och verifierar att alla 20 saldojusteringar lyckas; den pessimistiska låsningen serialiserar dem (`SELECT ... FOR UPDATE`), vilket syns på att saldot räknas ned monotont utan tappade uppdateringar. Två ärliga begränsningar: assertionen kontrollerar *antalet* lyckade justeringar, inte slutsaldot explicit — att även asserta att saldot landar på start − 20 vore en starkare kontroll. Och leveransflödet skyddas av *samma* lås men har inget eget test; deadlock-scenarier är inte täckta. Viktig distinktion: låsmekanismen är bevisad och gör sitt jobb till rätt kostnad — det är *testtäckningen* som inte är komplett, inte säkerheten. Låset behöver inte förändras för den här skalan.
 
-- **Beställningar skapas inte via UI än.** Läkemedel kan skapas, redigeras och tas bort via formulär i frontend (med klientvalidering som speglar Bean Validation, och fältfel från backend som visas per fält). Att *skapa* en ny beställning med orderrader finns däremot bara som API-endpoint, testad med curl — frontend visar och muterar beställningars status men har inget formulär för att lägga en ny order. Medvetet bortval för att skydda tid.
-
 - **Sökningen hämtar om vid varje tangenttryck.** Sök/filter-fältet utlöser ett nytt API-anrop för varje ändring. För demons datamängd är det omärkbart, men vid hundratals poster och många användare vore en debounce (vänta ~300 ms efter sista tangenttryck) rätt — det skulle minska antalet anrop utan att märkas i UX:en. Medvetet utelämnat som en optimering som inte behövs vid den här skalan.
+
+- **Order-skapande saknar toast-bekräftelse.** Att skapa en beställning fungerar och listan uppdateras direkt, men det finns ingen uttrycklig success-notis. Klientvalideringen fångar fel före submit, men en kort bekräftelse ("Beställning skapad") vore tydligare UX. Litet, men noterat.
 
 - **AI-utkast persisteras inte med strukturerad metadata.** Förslaget sparas som en vanlig order med en notering om källan ("Gemini" respektive "Regelbaserad fallback"), men inte som strukturerad metadata (modell, prompt-version, tidpunkt). I en produktionskontext med audit-krav för AI-beslut vore det värt att spåra.
 
@@ -260,7 +262,7 @@ E-post-/in-app-notiser och CSV/PDF-export är specificerade som valbara i caset 
 
 I prioritetsordning.
 
-**1. Resterande frontend-formulär.** Läkemedel kan skapas, redigeras och tas bort via UI, och listan har sök/filter; det som återstår är ett formulär för att *skapa* en beställning (med orderrader), med klientvalidering som speglar Bean Validation även där. Plus toast-notiser för success/fel och bekräftelsedialog före fler irreversibla actions (borttagning av läkemedel har redan en `window.confirm`; t.ex. Avbryt-övergången har ingen ännu).
+**1. Putsa frontend-flödena.** Kärnformulären finns — läkemedel (skapa/redigera/ta bort), sök/filter, och skapa beställning — men UX kan förfinas: toast-notiser för success/fel, bekräftelsedialog före fler irreversibla actions (borttagning av läkemedel har redan en `window.confirm`; t.ex. Avbryt-övergången har ingen ännu), och inline-fältfel i order-formuläret istället för ett samlat felmeddelande.
 
 **2. Härda autentiseringen.** Token-/sessionsbaserad inloggning för webbklienten (Basic är stateless men skickar credentials vid varje request), kontolåsning/rate limiting vid misslyckade försök, och en UI för användaradministration (skapa/spärra användare, återställ lösenord). Rollgenomdrivningen finns redan — det är skyddet runt själva inloggningen som skulle stärkas.
 
