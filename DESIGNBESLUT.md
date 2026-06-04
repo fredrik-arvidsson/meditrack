@@ -23,6 +23,8 @@ Caset frågar uttryckligen vad som händer när två sjuksköterskor beställer 
 
 Varför inte samma överallt: pessimistisk låsning kostar väntan och har deadlock-risk; optimistisk kostar retries vid konflikt. Vid den integritetskritiska saldouppdateringen är en kort, smal låsning att föredra framför en retry-loop — för användaren är "det tog en halv sekund till" bättre än "försök igen".
 
+Låsningen är verifierad med ett concurrency-test: 20 trådar gör samtidiga saldojusteringar mot en riktig MySQL (Testcontainers), och alla 20 serialiseras korrekt — saldot räknas ned utan tappade uppdateringar. Det skiljer ett *påstående* om låsning från ett *bevis*: testet dog först på en orelaterad sak (SecurityContext propageras inte till trådpoolens trådar), vilket fick mig att skilja "testet är trasigt" från "är låsningen korrekt" — koden var sund, testuppställningen var det inte.
+
 ## 3. Säkerhet — RBAC med separation of duties i två lager
 
 Rollbaserad åtkomstkontroll är ett regulatoriskt krav i vården (HSLF-FS 2017:37), inte ett tillägg — därför inbyggt från start, inte påbolt-at. Regeln har två karaktärer och ligger därför i två lager:
