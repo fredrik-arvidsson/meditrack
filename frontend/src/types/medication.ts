@@ -46,6 +46,7 @@ export type OrderLine = {
 export type Order = {
     id: number;
     orderNumber: string;
+    careUnitName: string;
     status: OrderStatus;
     lines: OrderLine[];
     sentAt: string | null;

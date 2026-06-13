@@ -96,6 +96,7 @@ function OrderDetailPage() {
                     <h2 className="text-2xl font-bold text-slate-900">
                         {data.orderNumber}
                     </h2>
+                    <p className="text-sm text-slate-500 mt-0.5">{data.careUnitName}</p>
                     {data.notes && (
                         <p className="text-sm text-slate-600 mt-1">{data.notes}</p>
                     )}

@@ -25,7 +25,11 @@ function OrdersPage() {
     return (
         <div>
             <div className="flex items-baseline justify-between mb-4">
-                <h2 className="text-2xl font-bold text-slate-900">Beställningar</h2>
+                <h2 className="text-2xl font-bold text-slate-900">
+                    {data && data.length > 0
+                        ? `Beställningar för ${data[0].careUnitName}`
+                        : "Beställningar"}
+                </h2>
                 {!showCreateForm && (
                     <button
                         onClick={() => setShowCreateForm(true)}

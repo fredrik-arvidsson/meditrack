@@ -14,6 +14,7 @@ import java.util.List;
 public record OrderResponse(
         Long id,
         String orderNumber,
+        String careUnitName,
         OrderStatus status,
         List<OrderLineResponse> lines,
         LocalDateTime sentAt,
@@ -30,6 +31,7 @@ public record OrderResponse(
         return new OrderResponse(
                 order.getId(),
                 order.getOrderNumber(),
+                order.getCareUnit().getName(),
                 order.getStatus(),
                 lineResponses,
                 order.getSentAt(),
