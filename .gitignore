@@ -1,60 +1,17 @@
-# Maven
-target/
-*.jar
-*.war
-*.nar
-*.ear
-*.zip
-*.tar.gz
-*.rar
-.mvn/wrapper/maven-wrapper.jar
+# Förberedelsedokument – ska ALDRIG pushas
+MEDITRACK_MANUS.*
+MEDITRACK_PRESENTATION.*
+MEDITRACK_STUDIEANTECKNINGAR.*
+MEDITRACK_INTERVJUFRAGOR.*
+MEDOVIA_ANNONS.*
 
-# IDE — IntelliJ
-.idea/
-*.iml
-*.iws
-*.ipr
-out/
-
-# IDE — VS Code
-.vscode/
-*.code-workspace
-
-# IDE — Eclipse
-.project
-.classpath
-.settings/
-bin/
-
-# macOS
+# Skräp som inte ska pushas
 .DS_Store
+.idea/
+target/
+*.iml
 
-# Logs
-*.log
-logs/
-
-# Spring Boot
-*.original
-HELP.md
-
-# Environment-specifika konfigurationer
-application-local.yml
-application-local.properties
-.env
-.env.local
-
-# Claude Code (egen state, hör inte hemma i Git)
-.claude/
-
-# Docker
-docker-compose.override.yml
-
-# OS / temp
-*.swp
-*.swo
-*~
-
-# Privata filer
-Presentation.pdf
-
-
+# Lokala dokumentversioner – håll repot rent med bara .md
+*.docx
+*.pdf
+*.svg
