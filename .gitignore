@@ -19,3 +19,4 @@ target/
 # Miljövariabler / hemligheter – ska aldrig committas
 .env
 .env.local
+VERIFIERING_INTERVJU*.md
